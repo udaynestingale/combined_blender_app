@@ -45,7 +45,13 @@ def process_request(input_file_key, output_file_key):
         print(f"File {input_file_key} downloaded to {input_file_path}")
 
         # Run Blender Python script
-        os.system(f'blender -b -P {blender_script_path} -- {input_file_path} {output_file_path}')
+        from app.services.blender_service import run_blender_script
+        run_blender_script(
+            blender_script_path,
+            input_file_path,
+            None,
+            output_file_path=output_file_path
+        )
         print("File conversion completed")
 
         # Upload output file to S3

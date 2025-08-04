@@ -56,7 +56,18 @@ def process_request(data):
         s3_client.download_file(S3_BUCKET_NAME, data['glb_image_key'], input_file_path)
         print(f"File {data['glb_image_key']} downloaded to {input_file_path}")
 
-        os.system(f'blender -b -P {blender_script_path} -- {input_file_path} -d {output_dir} --generate-mask --camera-json {camera_info} --lighting-json {lighting_info} --use-environment-map "studio.exr" --use-existing-camera --replace-product {replace_product_data}')
+        from app.services.blender_service import run_blender_script
+        run_blender_script(
+            blender_script_path,
+            input_file_path,
+            output_dir,
+            generate_mask=True,
+            camera_json=json.loads(camera_info),
+            lighting_json=json.loads(lighting_info),
+            use_environment_map="studio.exr",
+            use_existing_camera=True,
+            replace_product=json.loads(replace_product_data)
+        )
         print("2D image and masks are generated")
 
         s3_client.upload_file(generated_2d_image_local_path, S3_BUCKET_NAME, data['generated_2d_image_key'])
