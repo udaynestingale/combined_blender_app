@@ -1,0 +1,8 @@
+FastAPI
+uvicorn
+boto3
+pydantic
+python-dotenv
+pytest
+pytest-asyncio
+moto3
