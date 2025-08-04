@@ -45,15 +45,15 @@ async def process_glb(request: Product2DTo3DRequest):
 
 def process_request(product_type, product_sku_id, output_s3_file_key, product_image_s3_path, product_image_s3_path2):
     try:
-        input_file_path = f'/home/ubuntu/product_2d_to_3d/input_image_{product_sku_id}.png'
-        blender_script_path = '/home/ubuntu/product_2d_to_3d/create_Rug_or_Pillow_GLB_public.py'
+        input_file_path = f'../scripts/product_2d_to_3d/input_image_{product_sku_id}.png'
+        blender_script_path = '../scripts/product_2d_to_3d/create_Rug_or_Pillow_GLB_public.py'
 
         # Download input image from S3 using service
         s3_service.download_file(product_image_s3_path, input_file_path)
         print(f"File {product_image_s3_path} downloaded to {input_file_path}")
 
         if product_type == "pillow":
-            input_file_path2 = f'/home/ubuntu/product_2d_to_3d/input_image2_{product_sku_id}.png'
+            input_file_path2 = f'../scripts/product_2d_to_3d/input_image2_{product_sku_id}.png'
             s3_service.download_file(product_image_s3_path2, input_file_path2)
             print(f"File {product_image_s3_path2} downloaded to {input_file_path2}")
 
@@ -78,7 +78,7 @@ def process_request(product_type, product_sku_id, output_s3_file_key, product_im
 
         print(f"Blender processing complete for {input_file_path}")
 
-        output_file_path = f'/home/ubuntu/product_2d_to_3d/output.glb'
+        output_file_path = f'../scripts/product_2d_to_3d/output.glb'
         # Upload output file back to S3 using service
         s3_service.upload_file(output_file_path, output_s3_file_key)
         print(f"File {output_file_path} uploaded to {output_s3_file_key}")

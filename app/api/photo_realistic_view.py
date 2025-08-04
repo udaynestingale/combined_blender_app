@@ -47,9 +47,9 @@ async def generate_photo_realistic_view(request: PhotoRealisticViewRequest):
 
 def process_request(template_id, glb_image_key, generated_2d_image_key, all_masks_key, camera_info, lighting_info):
     try:
-        input_file_path = '/home/ubuntu/photo_realistic_view_generation/input_image.glb'
-        blender_script_path = '/home/ubuntu/photo_realistic_view_generation/blender_script.py'
-        output_dir = '/home/ubuntu/photo_realistic_view_generation/generated_files'
+        input_file_path = '../scripts/photo_realistic_view/input_image.glb'
+        blender_script_path = '../scripts/photo_realistic_view/blender_script.py'
+        output_dir = '../scripts/photo_realistic_view/generated_files'
         generated_2d_image_local_path = f'{output_dir}/room_render.png'
         all_masks_local_path = f'{output_dir}/mask_all_products.png'
 

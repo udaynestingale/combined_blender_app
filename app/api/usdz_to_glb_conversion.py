@@ -36,9 +36,9 @@ async def convert_usdz_to_glb(request: UsdzToGlbRequest):
 
 def process_request(input_file_key, output_file_key):
     try:
-        input_file_path = '/home/ubuntu/blender_with_furniture_scripts/input_image.usdz'
-        blender_script_path = '/home/ubuntu/blender_with_furniture_scripts/blender_with_furniture.py'
-        output_file_path = '/home/ubuntu/blender_with_furniture_scripts/output_image.glb'
+        input_file_path = '../scripts/usdz_to_glb_conversion/input_image.usdz'
+        blender_script_path = '../scripts/usdz_to_glb_conversion/blender_with_furniture.py'
+        output_file_path = '../scripts/usdz_to_glb_conversion/output_image.glb'
 
         # Download input file from S3
         s3_service.download_file(input_file_key, input_file_path)

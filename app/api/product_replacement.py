@@ -41,9 +41,9 @@ async def replace_product(request: ProductReplacementRequest):
 
 def process_request(data):
     try:
-        input_file_path = f'/home/ubuntu/product_replacement_script/input_image.glb'
-        blender_script_path = f'/home/ubuntu/product_replacement_script/blender_script_camera_public.py'
-        output_dir = '/home/ubuntu/product_replacement_script/generated_files'
+        input_file_path = f'../scripts/product_replacement/input_image.glb'
+        blender_script_path = f'../scripts/product_replacement/blender_script_camera_public.py'
+        output_dir = '../scripts/product_replacement/generated_files'
         generated_2d_image_local_path = f'{output_dir}/room_render.png'
         all_masks_local_path = f'{output_dir}/mask_all_products.png'
         target_product_mask_local_path = f'{output_dir}/mask_{data["product_sku_id"]}.png'
