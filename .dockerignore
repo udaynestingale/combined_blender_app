@@ -1,0 +1,45 @@
+# Git
+.git
+.gitignore
+.github
+
+# Docker
+.dockerignore
+docker-compose.yml
+Dockerfile
+
+# Python
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.Python
+**/env
+**/venv
+**/ENV
+**/env.bak
+**/venv.bak
+**/.env
+**/.venv
+**/pip-log.txt
+**/pip-delete-this-directory.txt
+**/.pytest_cache
+**/.coverage
+**/htmlcov
+
+# Editor directories and files
+.idea
+.vscode
+*.swp
+*.swo
+
+# Temporary Blender files
+**/*.blend1
+**/*.blend2
+**/generated_files/*
+**/blender_working_data/*
+
+# OS specific
+.DS_Store
+**/.DS_Store
+**/Thumbs.db
