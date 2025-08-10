@@ -1,10 +1,9 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks, status
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 import json
 import os
 import logging
-from typing import Optional
+from typing import Optional, List
 
 from app.core.config import get_settings
 from app.core.monitoring import track_time, BLENDER_PROCESSING_TIME
@@ -56,12 +55,27 @@ async def process_glb(request: Product2DTo3DRequest):
         # Define working directory and paths
         working_dir = os.path.join(settings.BLENDER_SCRIPTS_PATH, 'product_2d_to_3d')
         script_path = os.path.join(working_dir, 'create_Rug_or_Pillow_GLB_public.py')
+        
+        # Create working directory if it doesn't exist
+        os.makedirs(working_dir, exist_ok=True)
+        os.makedirs(os.path.join(working_dir, 'input'), exist_ok=True)
 
-        # Configure input and output files
-        input_files = [request.product_image_s3_path]
+        # Download input files from S3
+        input_files_s3 = [request.product_image_s3_path]
         if request.product_type == "pillow" and request.product_image_s3_path2:
-            input_files.append(request.product_image_s3_path2)
+            input_files_s3.append(request.product_image_s3_path2)
+            
+        local_input_files = []
+        for i, s3_path in enumerate(input_files_s3):
+            file_name = f"input_{i}_{os.path.basename(s3_path)}"
+            local_path = os.path.join(working_dir, 'input', file_name)
+            
+            logger.info(f"Downloading input file from S3: {s3_path} to {local_path}")
+            await s3_service.download_file_async(s3_path, local_path)
+            local_input_files.append(local_path)
+            logger.info(f"Successfully downloaded input file {i+1}")
 
+        # Configure output files
         output_files = [
             OutputFile(
                 local_path=os.path.join(working_dir, 'output.glb'),
@@ -70,13 +84,29 @@ async def process_glb(request: Product2DTo3DRequest):
             )
         ]
 
-        # Process the request
+        # Construct Blender command as a list of arguments
+        blender_path = settings.BLENDER_PATH if hasattr(settings, 'BLENDER_PATH') else 'blender'
+        blender_command = [
+            blender_path,
+            "--background",
+            "--python", script_path,
+            "--",  # Argument separator
+        ]
+        
+        # Add local input files to command
+        blender_command.extend(local_input_files)
+        
+        # Add working directory
+        blender_command.extend(["-d", working_dir])
+        
+        # Add additional parameters
+        blender_command.extend([f"--product_type", json.dumps(request.product_type)])
+
+        # Process the request with the new approach
         processed_files = await process_blender_request_async(
-            script_path=script_path,
-            input_files=input_files,
-            output_files=output_files,
             working_dir=working_dir,
-            product_type=request.product_type
+            blender_command=blender_command,
+            output_files=output_files
         )
 
         return {
@@ -97,129 +127,43 @@ async def process_glb(request: Product2DTo3DRequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+    finally:
+        # Clean up the downloaded input files and local output files
+        try:
+            # Clean up input files
+            for local_file in local_input_files:
+                if os.path.exists(local_file):
+                    os.remove(local_file)
+                    logger.info(f"Cleaned up input file: {local_file}")
+            
+            # Clean up output files - they should be already uploaded to S3
+            for output_file in output_files:
+                if os.path.exists(output_file.local_path):
+                    os.remove(output_file.local_path)
+                    logger.info(f"Cleaned up output file: {output_file.local_path}")
+                    
+            # Clean up any other temporary files in the working directory
+            input_dir = os.path.join(working_dir, 'input')
+            if os.path.exists(input_dir) and os.path.isdir(input_dir):
+                for filename in os.listdir(input_dir):
+                    file_path = os.path.join(input_dir, filename)
+                    if os.path.isfile(file_path):
+                        os.remove(file_path)
+                        logger.info(f"Cleaned up temporary file: {file_path}")
+                        
+        except Exception as e:
+            logger.warning(f"Error during cleanup: {str(e)}")
     
 
-async def process_product_async(request: Product2DTo3DRequest) -> str:
+async def cleanup_files(*file_paths: str):
     """
-    Asynchronously process the 2D to 3D conversion request.
-    Returns the task ID for tracking.
-    """
-    try:
-        # Set up file paths
-        input_file_path = os.path.join(
-            settings.BLENDER_SCRIPTS_PATH,
-            'product_2d_to_3d',
-            f'input_image_{request.product_sku_id}.png'
-        )
-        input_file_path2 = None
-        if request.product_image_s3_path2:
-            input_file_path2 = os.path.join(
-                settings.BLENDER_SCRIPTS_PATH,
-                'product_2d_to_3d',
-                f'input_image2_{request.product_sku_id}.png'
-            )
-
-        blender_script_path = os.path.join(
-            settings.BLENDER_SCRIPTS_PATH,
-            'product_2d_to_3d',
-            'create_Rug_or_Pillow_GLB_public.py'
-        )
-        output_dir = os.path.join(settings.BLENDER_SCRIPTS_PATH, 'product_2d_to_3d')
-
-        # Download input files
-        await s3_service.download_file_async(request.product_image_s3_path, input_file_path)
-        logger.info(f"Downloaded main image to {input_file_path}")
-
-        if request.product_type == "pillow" and request.product_image_s3_path2:
-            await s3_service.download_file_async(request.product_image_s3_path2, input_file_path2)
-            logger.info(f"Downloaded secondary image to {input_file_path2}")
-
-        # Prepare Blender parameters
-        blender_params = {
-            "product_type": request.product_type,
-            "output_dir": output_dir
-        }
-        if input_file_path2:
-            blender_params["input_file_path2"] = input_file_path2
-
-        # Start async Blender processing
-        task_id = await process_blender_request_async(
-            blender_script_path,
-            input_file_path,
-            output_dir,
-            **blender_params
-        )
-
-        # Set up completion callback
-        async def on_complete(success: bool):
-            try:
-                if success:
-                    output_file_path = os.path.join(output_dir, 'output.glb')
-                    await s3_service.upload_file_async(output_file_path, request.output_s3_file_key)
-                    logger.info(f"Uploaded output file to {request.output_s3_file_key}")
-
-                    message_body = {
-                        "eventType": "twodToThreedFileCreated",
-                        "projectId": request.product_sku_id,
-                        "taskId": task_id
-                    }
-                else:
-                    message_body = {
-                        "eventType": "twodToThreedFileFailed",
-                        "projectId": request.product_sku_id,
-                        "taskId": task_id
-                    }
-
-                await sqs_service.send_message_async(json.dumps(message_body))
-                logger.info(f"Sent completion status to SQS: {message_body['eventType']}")
-
-            except Exception as e:
-                logger.error(f"Error in completion callback: {str(e)}")
-                raise
-
-        # Register the callback
-        from app.services.blender_service import register_completion_callback
-        register_completion_callback(task_id, on_complete)
-
-        return task_id
-
-    except Exception as e:
-        logger.error(f"Error processing request for SKU {request.product_sku_id}: {str(e)}")
-        raise
-
-@router.get('/task/{task_id}', response_model=TaskResponse)
-async def get_task_status(task_id: str):
-    """
-    Get the status of a 2D to 3D conversion task.
+    Clean up temporary files after processing.
     """
     try:
-        from app.services.blender_service import celery_app
-        task = celery_app.AsyncResult(task_id)
-        
-        if task.ready():
-            if task.successful():
-                return TaskResponse(
-                    task_id=task_id,
-                    status="completed",
-                    message="Conversion completed successfully"
-                )
-            else:
-                return TaskResponse(
-                    task_id=task_id,
-                    status="failed",
-                    message=str(task.result)
-                )
-        else:
-            return TaskResponse(
-                task_id=task_id,
-                status="processing",
-                message="Task is still processing"
-            )
-
+        for file_path in file_paths:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                logger.info(f"Cleaned up temporary file: {file_path}")
     except Exception as e:
-        logger.error(f"Error checking task status: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+        logger.error(f"Error cleaning up files: {str(e)}")
   

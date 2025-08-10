@@ -6,3 +6,4 @@ router = APIRouter()
 from .photo_realistic_view import *
 from .product_2d_to_3d import *
 from .product_replacement import *
+from .usdz_to_glb_conversion import *
