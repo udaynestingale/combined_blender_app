@@ -1,5 +1,6 @@
 from prometheus_client import Counter, Histogram, Info
 import time
+import asyncio
 from functools import wraps
 from typing import Callable, Any
 

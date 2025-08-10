@@ -20,6 +20,7 @@ class ProductReplacementRequest(BaseModel):
     generated_2d_image_key: str
     all_masks_key: str
     target_product_mask_key: str
+    target_product_image_key: str
     camera_info: CameraInfo
     lighting_info: LightingInfo
     replace_product_data: ReplaceProductData

@@ -1,4 +1,4 @@
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 from functools import lru_cache
 from typing import List
 
@@ -28,9 +28,15 @@ class Settings(BaseSettings):
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE: int = 60
     
-    class Config:
-        case_sensitive = True
-        env_file = ".env"
+    # Additional settings
+    S3_REGION: str = ""
+    LOG_LEVEL: str = "INFO"
+    
+    model_config = {
+        "case_sensitive": True,
+        "env_file": ".env",
+        "extra": "allow"  # Allow extra fields from environment variables
+    }
 
 @lru_cache()
 def get_settings() -> Settings:

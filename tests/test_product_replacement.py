@@ -10,6 +10,7 @@ def test_replace_product_success():
         "generated_2d_image_key": "path/to/generated_2d_image.png",
         "all_masks_key": "path/to/all_masks.png",
         "target_product_mask_key": "path/to/target_mask.png",
+        "target_product_image_key": "path/to/target_image.png",
         "camera_info": {"field_of_view": 90},
         "lighting_info": {"intensity": 1.0},
         "replace_product_data": {"new_product_id": "67890"}
@@ -28,6 +29,7 @@ def test_replace_product_invalid_data():
         "generated_2d_image_key": "path/to/generated_2d_image.png",
         "all_masks_key": "path/to/all_masks.png",
         "target_product_mask_key": "path/to/target_mask.png",
+        "target_product_image_key": "path/to/target_image.png",
         "camera_info": {"field_of_view": 90},
         "lighting_info": {"intensity": 1.0},
         "replace_product_data": "invalid_data"  # Invalid data type

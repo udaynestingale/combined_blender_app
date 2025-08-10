@@ -109,7 +109,8 @@ async def generate_photo_realistic_view(
             f"--lighting_json", json.dumps(request.lighting_info.dict()),
             f"--generate_mask", json.dumps(True),
             f"--combined_mask_only", json.dumps(True),
-            f"--r", json.dumps(1920)
+            f"--use_environment_map", json.dumps("studio.exr"),
+            f"--use_existing_camera", json.dumps(True)
         ]
 
         # Process the request with the new approach

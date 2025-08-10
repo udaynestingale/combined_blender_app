@@ -39,6 +39,7 @@ class ProductReplacementRequest(BaseModel):
     generated_2d_image_key: str = Field(..., description="S3 key for output 2D image")
     all_masks_key: str = Field(..., description="S3 key for all product masks")
     target_product_mask_key: str = Field(..., description="S3 key for target product mask")
+    target_product_image_key: str = Field(..., description="S3 key for target product image")
     camera_info: CameraInfo
     lighting_info: LightingInfo
     replace_product_data: ReplaceProductData
@@ -51,6 +52,7 @@ class ProductReplacementRequest(BaseModel):
                 "generated_2d_image_key": "outputs/render.png",
                 "all_masks_key": "outputs/all_masks.png",
                 "target_product_mask_key": "outputs/target_mask.png",
+                "target_product_image_key": "outputs/target_image.png",
                 "camera_info": {
                     "position": {"x": 0, "y": 2, "z": -5},
                     "rotation": {"x": 0, "y": 0, "z": 0},
@@ -114,6 +116,11 @@ async def replace_product(request: ProductReplacementRequest):
             OutputFile(
                 local_path=os.path.join(working_dir, 'target_mask.png'),
                 s3_key=request.target_product_mask_key,
+                file_type='png'
+            ),
+            OutputFile(
+                local_path=os.path.join(working_dir, 'target_image.png'),
+                s3_key=request.target_product_image_key,
                 file_type='png'
             )
         ]
