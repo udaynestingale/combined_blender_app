@@ -81,22 +81,22 @@ async def replace_product(request: ProductReplacementRequest):
         logger.info(
             "Processing product replacement request",
             extra={
-                "sku_id": request.product_sku_id,
-                "object_name": request.replace_product_data.object_name
+                "sku_id": request.product_sku_id
             }
         )
 
         # Define working directory and paths
-        working_dir = os.path.join(settings.BLENDER_SCRIPTS_PATH, 'product_replacement', 'generated_files')
-        script_path = os.path.join(settings.BLENDER_SCRIPTS_PATH, 'product_replacement', 'blender_script_camera_public.py')
-        
+        working_dir = os.path.join(settings.BLENDER_SCRIPTS_PATH, 'product_replacement')
+        script_path = os.path.join(working_dir, 'blender_script.py')
+        output_dir = os.path.join(working_dir, 'generated_files')
+
         # Create working directory if it doesn't exist
         os.makedirs(working_dir, exist_ok=True)
         os.makedirs(os.path.join(working_dir, 'input'), exist_ok=True)
+        os.makedirs(output_dir, exist_ok=True)
         
         # Download input GLB file from S3
         input_file_local_path = os.path.join(working_dir, 'input', os.path.basename(request.glb_image_key))
-        
         logger.info(f"Downloading input file from S3: {request.glb_image_key} to {input_file_local_path}")
         await s3_service.download_file_async(request.glb_image_key, input_file_local_path)
         logger.info(f"Successfully downloaded input file")
@@ -104,22 +104,22 @@ async def replace_product(request: ProductReplacementRequest):
         # Configure output files
         output_files = [
             OutputFile(
-                local_path=os.path.join(working_dir, 'render.png'),
+                local_path=os.path.join(output_dir, 'render.png'),
                 s3_key=request.generated_2d_image_key,
                 file_type='png'
             ),
             OutputFile(
-                local_path=os.path.join(working_dir, 'all_masks.png'),
+                local_path=os.path.join(output_dir, 'all_masks.png'),
                 s3_key=request.all_masks_key,
                 file_type='png'
             ),
             OutputFile(
-                local_path=os.path.join(working_dir, 'target_mask.png'),
+                local_path=os.path.join(output_dir, 'target_mask.png'),
                 s3_key=request.target_product_mask_key,
                 file_type='png'
             ),
             OutputFile(
-                local_path=os.path.join(working_dir, 'target_image.png'),
+                local_path=os.path.join(output_dir, 'target_image.png'),
                 s3_key=request.target_product_image_key,
                 file_type='png'
             )
