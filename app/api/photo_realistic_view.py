@@ -8,6 +8,7 @@ from app.core.config import get_settings
 from app.services.s3_service import S3Service
 from app.services.sqs_service import SQSService
 from app.services.blender_service import process_blender_request_async, BlenderError, OutputFile
+from app.utils.file_utils import cleanup_processing_files
 
 router = APIRouter()
 settings = get_settings()
@@ -138,41 +139,10 @@ async def generate_photo_realistic_view(
         )
     finally:
         # Clean up the downloaded input file and local output files
-        try:
-            # Clean up input file
-            if os.path.exists(input_file_local_path):
-                os.remove(input_file_local_path)
-                logger.info(f"Cleaned up input file: {input_file_local_path}")
-            
-            # Clean up output files - they should be already uploaded to S3
-            for output_file in output_files:
-                if os.path.exists(output_file.local_path):
-                    os.remove(output_file.local_path)
-                    logger.info(f"Cleaned up output file: {output_file.local_path}")
-                    
-            # Clean up any other temporary files in the working directory
-            input_dir = os.path.join(working_dir, 'input')
-            if os.path.exists(input_dir) and os.path.isdir(input_dir):
-                for filename in os.listdir(input_dir):
-                    file_path = os.path.join(input_dir, filename)
-                    if os.path.isfile(file_path):
-                        os.remove(file_path)
-                        logger.info(f"Cleaned up temporary file: {file_path}")
-                        
-        except Exception as e:
-            logger.warning(f"Error during cleanup: {str(e)}")
+        await cleanup_processing_files(
+            input_files=input_file_local_path, 
+            output_files=output_files,
+            working_dir=working_dir
+        )
 
-
-
-async def cleanup_files(*file_paths: str):
-    """
-    Clean up temporary files after processing.
-    """
-    try:
-        for file_path in file_paths:
-            if os.path.exists(file_path):
-                os.remove(file_path)
-                logger.info(f"Cleaned up temporary file: {file_path}")
-    except Exception as e:
-        logger.error(f"Error cleaning up files: {str(e)}")
-  
+# The cleanup_files function is now in utils.file_utils module
