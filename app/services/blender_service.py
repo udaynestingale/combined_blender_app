@@ -1,6 +1,7 @@
 import os
 import json
 import asyncio
+import subprocess
 from typing import Dict, Any, Optional, List, Tuple
 import logging
 from dataclasses import dataclass
@@ -58,30 +59,52 @@ async def run_blender_script(config: BlenderConfig) -> List[OutputFile]:
         # Ensure output directory exists
         os.makedirs(config.working_dir, exist_ok=True)
 
-        # Construct Blender command
-        input_files_str = ' '.join(local_input_files)
-        command = f'blender -b -P {config.script_path} -- {input_files_str} -d {config.working_dir}'
+        # Construct Blender command as a list of arguments
+        blender_path = settings.BLENDER_PATH if hasattr(settings, 'BLENDER_PATH') else 'blender'
+        command = [
+            blender_path,
+            "--background",
+            "--python", config.script_path,
+            "--",  # Argument separator
+        ]
+        
+        # Add input files
+        command.extend(local_input_files)
+        
+        # Add working directory
+        command.extend(["-d", config.working_dir])
+        
+        # Add additional parameters
         for key, value in config.additional_params.items():
-            command += f' --{key} {json.dumps(value)}'
+            command.extend([f"--{key}", json.dumps(value)])
 
-        logger.info(f"Running Blender command: {command}")
+        logger.info(f"Running Blender command: {' '.join(command)}")
 
         # Execute Blender command with retry logic
         for attempt in range(3):
             try:
-                process = await asyncio.create_subprocess_shell(
+                # Set a timeout that is slightly less than typical cloud service timeouts (e.g., 60 minutes)
+                result = subprocess.run(
                     command,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=3500  # 58.3 minutes in seconds
                 )
                 
-                stdout, stderr = await process.communicate()
-
-                if process.returncode == 0:
-                    logger.info(f"Blender processing complete")
-                    break
-                
-                error_msg = stderr.decode() if stderr else f"Process failed with code {process.returncode}"
+                logger.info(f"Blender processing complete")
+                break
+            
+            except subprocess.CalledProcessError as e:
+                error_msg = e.stderr if e.stderr else f"Process failed with code {e.returncode}"
+                logger.warning(f"Attempt {attempt + 1} failed: {error_msg}")
+                if attempt < 2:
+                    await asyncio.sleep(2 ** attempt)
+                else:
+                    raise BlenderError(f"All retry attempts failed: {error_msg}")
+            
+            except subprocess.TimeoutExpired as e:
+                error_msg = f"Blender process timed out after {e.timeout} seconds"
                 logger.warning(f"Attempt {attempt + 1} failed: {error_msg}")
                 if attempt < 2:
                     await asyncio.sleep(2 ** attempt)
@@ -96,26 +119,34 @@ async def run_blender_script(config: BlenderConfig) -> List[OutputFile]:
         # Upload output files to S3
         processed_files = []
         for output_file in config.output_files:
-            try:
-                await s3_service.upload_file_async(
-                    output_file.local_path, 
-                    output_file.s3_key
-                )
-                processed_files.append(output_file)
-                logger.info(f"Uploaded {output_file.local_path} to {output_file.s3_key}")
-            except S3ServiceError as e:
-                raise BlenderError(f"Failed to upload output file: {str(e)}")
+            if os.path.exists(output_file.local_path):
+                try:
+                    await s3_service.upload_file_async(
+                        output_file.local_path, 
+                        output_file.s3_key
+                    )
+                    processed_files.append(output_file)
+                    logger.info(f"Uploaded {output_file.local_path} to {output_file.s3_key}")
+                except S3ServiceError as e:
+                    raise BlenderError(f"Failed to upload output file {output_file.local_path}: {str(e)}")
+            else:
+                logger.warning(f"Output file {output_file.local_path} does not exist. Skipping upload.")
 
         return processed_files
 
     finally:
         # Cleanup temporary files
         try:
+            # Only clean up downloaded input files
             for input_file in local_input_files:
-                if os.path.exists(input_file):
+                if input_file.startswith(config.working_dir) and os.path.exists(input_file):
+                    logger.debug(f"Cleaning up temporary input file: {input_file}")
                     os.remove(input_file)
+            
+            # Clean up output files if they were successfully uploaded to S3
             for output_file in config.output_files:
                 if os.path.exists(output_file.local_path):
+                    logger.debug(f"Cleaning up temporary output file: {output_file.local_path}")
                     os.remove(output_file.local_path)
         except Exception as e:
             logger.warning(f"Error cleaning up temporary files: {str(e)}")
@@ -133,8 +164,19 @@ async def process_blender_request_async(
     """
     try:
         # Validate parameters
-        if not script_path or not input_files:
-            raise ValueError("Script path and input files are required")
+        if not script_path:
+            raise ValueError("Script path is required")
+        if not os.path.exists(script_path):
+            raise ValueError(f"Script file not found: {script_path}")
+        if not input_files:
+            raise ValueError("At least one input file is required")
+        if not output_files:
+            raise ValueError("At least one output file configuration is required")
+        if not working_dir:
+            raise ValueError("Working directory is required")
+
+        # Create working directory if it doesn't exist
+        os.makedirs(working_dir, exist_ok=True)
 
         # Create Blender configuration
         config = BlenderConfig(
@@ -148,6 +190,9 @@ async def process_blender_request_async(
         # Process the request and handle files
         return await run_blender_script(config)
 
+    except ValueError as e:
+        logger.error(f"Invalid parameters for Blender request: {str(e)}")
+        raise BlenderError(str(e))
     except Exception as e:
-        logger.error(f"Error processing Blender request: {str(e)}")
+        logger.error(f"Error processing Blender request: {str(e)}", exc_info=True)
         raise BlenderError(str(e))
