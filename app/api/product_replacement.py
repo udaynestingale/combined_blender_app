@@ -18,21 +18,6 @@ s3_service = S3Service(settings.S3_BUCKET_NAME, settings.AWS_REGION)
 sqs_service = SQSService(settings.SQS_QUEUE_URL)
 router = APIRouter()
 
-class CameraInfo(BaseModel):
-    position: Dict[str, float]
-    rotation: Dict[str, float]
-    focal_length: float = Field(50.0, ge=0.0)
-
-class LightingInfo(BaseModel):
-    intensity: float = Field(..., ge=0.0)
-    color: Dict[str, float]
-    position: Dict[str, float]
-
-class ReplaceProductData(BaseModel):
-    object_name: str
-    new_material_path: str
-    scale: Dict[str, float] = Field(default_factory=lambda: {"x": 1.0, "y": 1.0, "z": 1.0})
-
 class ProductReplacementRequest(BaseModel):
     product_sku_id: str = Field(..., description="Unique identifier for the product")
     glb_image_key: str = Field(..., description="S3 key for input GLB file")
@@ -40,9 +25,9 @@ class ProductReplacementRequest(BaseModel):
     all_masks_key: str = Field(..., description="S3 key for all product masks")
     target_product_mask_key: str = Field(..., description="S3 key for target product mask")
     target_product_image_key: str = Field(..., description="S3 key for target product image")
-    camera_info: CameraInfo
-    lighting_info: LightingInfo
-    replace_product_data: ReplaceProductData
+    camera_info: Any = Field(..., description="Camera information for rendering")
+    lighting_info: Any = Field(..., description="Lighting information for rendering")
+    replace_product_data: Any = Field(..., description="Data for replacing the product in the scene")
 
     class Config:
         schema_extra = {
@@ -53,21 +38,9 @@ class ProductReplacementRequest(BaseModel):
                 "all_masks_key": "outputs/all_masks.png",
                 "target_product_mask_key": "outputs/target_mask.png",
                 "target_product_image_key": "outputs/target_image.png",
-                "camera_info": {
-                    "position": {"x": 0, "y": 2, "z": -5},
-                    "rotation": {"x": 0, "y": 0, "z": 0},
-                    "focal_length": 50.0
-                },
-                "lighting_info": {
-                    "intensity": 1.0,
-                    "color": {"r": 1.0, "g": 1.0, "b": 1.0},
-                    "position": {"x": 0, "y": 5, "z": 0}
-                },
-                "replace_product_data": {
-                    "object_name": "Product_1",
-                    "new_material_path": "materials/new_material.png",
-                    "scale": {"x": 1.0, "y": 1.0, "z": 1.0}
-                }
+                "camera_info": {},
+                "lighting_info": {},
+                "replace_product_data": {}
             }
         }
 
@@ -136,11 +109,11 @@ async def replace_product(request: ProductReplacementRequest):
             input_file_local_path,  # Local path to input file instead of S3 key
             "-d", working_dir,  # Working directory
             f"--generate_mask", json.dumps(True),
-            f"--camera_json", json.dumps(request.camera_info.dict()),
-            f"--lighting_json", json.dumps(request.lighting_info.dict()),
+            f"--camera_json", json.dumps(request.camera_info),
+            f"--lighting_json", json.dumps(request.lighting_info),
             f"--use_environment_map", json.dumps("studio.exr"),
             f"--use_existing_camera", json.dumps(True),
-            f"--replace_product", json.dumps(request.replace_product_data.dict())
+            f"--replace_product", json.dumps(request.replace_product_data)
         ]
 
         # Process the request with the new approach
