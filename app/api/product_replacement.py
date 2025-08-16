@@ -143,10 +143,10 @@ async def replace_product(request: ProductReplacementRequest):
         )
     finally:
         # Clean up the downloaded input file and local output files
-        await cleanup_processing_files(
-            input_files=input_file_local_path,
-            output_files=output_files,
-            working_dir=working_dir
-        )
+        # await cleanup_processing_files(
+        #     input_files=input_file_local_path,
+        #     output_files=output_files,
+        #     working_dir=working_dir
+        # )
 
 # The cleanup_files function is now in utils.file_utils module
